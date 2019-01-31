@@ -1,11 +1,10 @@
 module Translate where
 import AbsC
-import AbsC
 import ErrM
+import Debug.Trace
 type Result = Err String
---0
--- failure :: Show a => a -> Result
--- failure x = Bad $ "Undefined case: " ++ show x
+
+
 --1
 transIdent :: Ident -> Ident
 transIdent x = case x of
@@ -17,10 +16,10 @@ transUnsigned x = case x of
    Unsigned str  -> Unsigned str
 --符号なし整数
 
--- ansLong :: Long -> Long
--- transLong x = case x of
---   Long str  -> Long str
--- --64bit整数
+transLong :: Long -> Long
+transLong x = case x of
+   Long str  -> Long str
+--64bit整数
 
 transUnsignedLong :: UnsignedLong -> UnsignedLong
 transUnsignedLong x = case x of
@@ -89,8 +88,8 @@ transProgram x = case x of
 
 transExternal_declaration :: External_declaration -> External_declaration
 transExternal_declaration x = case x of
-   Afunc function_def  -> Afunc (transFunction_def  function_def)
-   Global dec  -> Global(transDec dec)
+   Afunc function_def  -> Afunc (transFunction_def function_def)
+   Global dec  -> Global (transDec dec)
 
 --18
 transFunction_def :: Function_def -> Function_def
@@ -283,9 +282,9 @@ transStm x = case x of
   LabelS labeled_stm  -> LabelS (transLabeled_stm labeled_stm)
   CompS compound_stm  ->  CompS (transCompound_stm compound_stm)
   ExprS expression_stm  -> ExprS (transExpression_stm expression_stm)
-  SelS selection_stm  ->  SelS selection_stm
-  IterS iter_stm  -> IterS iter_stm
-  JumpS jump_stm  -> JumpS jump_stm
+  SelS selection_stm  ->  SelS (transSelection_stm selection_stm)
+  IterS iter_stm  -> IterS (transIter_stm iter_stm) 
+  JumpS jump_stm  -> JumpS (transJump_stm jump_stm)
 
 --44
 transLabeled_stm :: Labeled_stm -> Labeled_stm
@@ -297,9 +296,9 @@ transLabeled_stm x = case x of
 transCompound_stm :: Compound_stm -> Compound_stm
 transCompound_stm x = case x of
   ScompOne  -> ScompOne
-  ScompTwo stms  -> ScompTwo stms
+  ScompTwo stms  -> ScompTwo (map transStm stms)
   ScompThree decs  -> ScompThree (map transDec decs)
-  ScompFour decs stms  -> ScompFour (map transDec decs) stms
+  ScompFour decs stms  -> ScompFour (map transDec decs) (map transStm stms)
 
 --46
 transExpression_stm :: Expression_stm -> Expression_stm
@@ -310,17 +309,25 @@ transExpression_stm x = case x of
 --47
 transSelection_stm :: Selection_stm -> Selection_stm
 transSelection_stm x = case x of
-  SselOne exp stm  -> SselOne (transExp exp) stm
-  SselTwo exp stm1 stm2  -> SselTwo (transExp exp) stm1 stm2
-  SselThree exp stm  -> SselThree (transExp exp) stm
+  SselOne exp stm  -> SselOne (transExp exp) (transStm stm)
+  SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm (CompS (ScompTwo[stm1,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 0))))]))) (transStm (CompS (ScompTwo[stm2,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 1))))])))
+  SselThree exp stm  -> SselThree (transExp exp) (transStm stm)
+
+-- --47
+-- transSelection_stm :: Selection_stm -> Selection_stm
+-- transSelection_stm x = case x of
+--   SselOne exp stm  -> SselOne (transExp exp) (transStm stm)
+--   SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm stm1)(transStm stm2)
+-- --SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm stm1)(transStm stm2)
+--   SselThree exp stm  -> SselThree (transExp exp) (transStm stm)
 
 --48
 transIter_stm :: Iter_stm -> Iter_stm
 transIter_stm x = case x of
-  SiterOne exp stm  -> SiterOne (transExp exp) stm
-  SiterTwo stm exp  -> SiterTwo stm (transExp exp)
-  SiterThree expression_stm1 expression_stm2 stm3  -> SiterThree (transExpression_stm expression_stm1) (transExpression_stm expression_stm2) stm3
-  SiterFour expression_stm1 expression_stm2 exp3 stm4  -> SiterFour (transExpression_stm expression_stm1) (transExpression_stm expression_stm2) (transExp exp3) stm4
+  SiterOne exp stm  -> SiterOne (transExp exp) (transStm stm)
+  SiterTwo stm exp  -> SiterTwo (transStm stm) (transExp exp)
+  SiterThree expression_stm1 expression_stm2 stm3  -> SiterThree (transExpression_stm expression_stm1) (transExpression_stm expression_stm2) (transStm stm3)
+  SiterFour expression_stm1 expression_stm2 exp3 stm4  -> SiterFour (transExpression_stm expression_stm1) (transExpression_stm expression_stm2) (transExp exp3) (transStm stm4)
 
 --49
 transJump_stm :: Jump_stm -> Jump_stm
@@ -333,9 +340,12 @@ transJump_stm x = case x of
 
 --50
 transExp :: Exp -> Exp
-transExp x = case x of
+transExp x = traceShow "here" $ case x of
   Ecomma exp1 exp2  -> Ecomma (transExp exp1) (transExp exp2)
-  Eassign exp1 assignment_op2 exp3  -> Eassign (transExp exp1) (transAssignment_op assignment_op2) (transExp exp3)
+  Eassign exp1 assignment_op2 exp3 ->Eassign (transExp exp1)(transAssignment_op assignment_op2)(transExp exp3)
+ -- Eassign exp1 Assign exp3 ->
+   -- Ecomma (Eassign (transExp exp1) Assign  (Econst(Eint 0)))
+     --      (Eassign (transExp exp1) AssignAdd (transExp exp3))
   Econdition exp1 exp2 exp3  -> Econdition (transExp exp1) (transExp exp2) (transExp exp3)
   Elor exp1 exp2  -> Elor (transExp exp1) (transExp exp2)
   Eland exp1 exp2  -> Eland (transExp exp1) (transExp exp2)
@@ -378,19 +388,19 @@ transConstant x = case x of
   Efloat d  -> Efloat d
   Echar c  -> Echar c
   Eunsigned unsigned  -> Eunsigned (transUnsigned unsigned)
-  Elong long  -> Elong long
-  Eunsignlong unsignedlong  -> Eunsignlong unsignedlong
-  Ehexadec hexadecimal  ->  Ehexadec hexadecimal
-  Ehexaunsign hexunsigned  -> Ehexaunsign hexunsigned
-  Ehexalong hexlong  ->  Ehexalong hexlong
-  Ehexaunslong hexunslong  -> Ehexaunslong hexunslong
-  Eoctal octal  -> Eoctal octal
-  Eoctalunsign octalunsigned  ->  Eoctalunsign octalunsigned 
-  Eoctallong octallong  ->  Eoctallong octallong
-  Eoctalunslong octalunslong  ->  Eoctalunslong octalunslong
-  Ecdouble cdouble  -> Ecdouble cdouble
-  Ecfloat cfloat  -> Ecfloat cfloat
-  Eclongdouble clongdouble  -> Eclongdouble clongdouble
+  Elong long  -> Elong (transLong long)
+  Eunsignlong unsignedlong  -> Eunsignlong (transUnsignedLong unsignedlong)
+  Ehexadec hexadecimal  ->  Ehexadec (transHexadecimal hexadecimal)
+  Ehexaunsign hexunsigned  -> Ehexaunsign (transHexUnsigned hexunsigned)
+  Ehexalong hexlong  ->  Ehexalong (transHexLong hexlong)
+  Ehexaunslong hexunslong  -> Ehexaunslong (transHexUnsLong hexunslong)
+  Eoctal octal  -> Eoctal (transOctal octal)
+  Eoctalunsign octalunsigned  ->  Eoctalunsign (transOctalUnsigned octalunsigned) 
+  Eoctallong octallong  ->  Eoctallong (transOctalLong octallong)
+  Eoctalunslong octalunslong  ->  Eoctalunslong (transOctalUnsLong octalunslong)
+  Ecdouble cdouble  -> Ecdouble (transCDouble cdouble)
+  Ecfloat cfloat  -> Ecfloat (transCFloat cfloat)
+  Eclongdouble clongdouble  -> Eclongdouble (transCLongDouble clongdouble)
   Eint n  ->  Eint n
   Elonger n  -> Elonger n
   Edouble d  -> Edouble d
