@@ -3,7 +3,17 @@ import AbsC
 import ErrM
 import Debug.Trace
 type Result = Err String
+--47
+transSelection_stm :: Selection_stm -> Selection_stm
+transSelection_stm x = case x of
+  SselOne exp stm  -> SselOne (transExp exp) (transStm stm)
+  SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm (CompS (ScompTwo[stm1,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 0))))]))) (transStm (CompS (ScompTwo[stm2,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 1))))])))
+--SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm stm1)(transStm stm2)
+  SselThree exp stm  -> SselThree (transExp exp) (transStm stm)
 
+--0
+-- failure :: Show a => a -> Result
+-- failure x = Bad $ "Undefined case: " ++ show x
 
 --1
 transIdent :: Ident -> Ident
@@ -305,13 +315,6 @@ transExpression_stm :: Expression_stm -> Expression_stm
 transExpression_stm x = case x of
   SexprOne  -> SexprOne
   SexprTwo exp  -> SexprTwo (transExp exp)
-
---47
-transSelection_stm :: Selection_stm -> Selection_stm
-transSelection_stm x = case x of
-  SselOne exp stm  -> SselOne (transExp exp) (transStm stm)
-  SselTwo exp stm1 stm2  -> SselTwo (transExp exp)(transStm (CompS (ScompTwo[stm1,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 0))))]))) (transStm (CompS (ScompTwo[stm2,ExprS (SexprTwo (Eassign (Evar (Ident "b")) Assign (Econst (Eint 1))))])))
-  SselThree exp stm  -> SselThree (transExp exp) (transStm stm)
 
 -- --47
 -- transSelection_stm :: Selection_stm -> Selection_stm
